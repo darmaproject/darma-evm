@@ -17,6 +17,7 @@
 package wavm
 
 import (
+	"fmt"
 	"bytes"
 	"encoding/json"
 	"github.com/darmaproject/darmasuite/config"
@@ -440,4 +441,27 @@ func (wavm *WAVM) GetTime() *big.Int {
 
 func (wavm *WAVM) GetBlockNum() *big.Int {
 	return wavm.BlockNumber
+}
+
+func (wavm *WAVM) Deposit(caller common.Address, amount big.Int) (err error) {
+	if !wavm.StateDB.Exist(caller) {
+		wavm.StateDB.CreateAccount(caller)
+	}
+	wavm.StateDB.AddBalance(caller,&amount)
+	return nil
+}
+
+func (wavm *WAVM) Withdraw(caller common.Address, amount big.Int) (error) {
+	if !wavm.StateDB.Exist(caller) {
+		return fmt.Errorf("caller is not exists. caller= %x", caller)
+	}
+	balance := wavm.StateDB.GetBalance(caller)
+	if balance == nil {
+		return fmt.Errorf("caller's balance is nil. caller= %x", caller)
+	}
+	if balance.Cmp(&amount) < 0 { // if balance < amount
+		return fmt.Errorf("caller's balance is not enough. caller= %x, balance= %s, amount= %s", caller,balance.String(),amount.String())
+	}
+	wavm.StateDB.SubBalance(caller,&amount)
+	return nil
 }

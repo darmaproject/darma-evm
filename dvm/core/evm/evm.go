@@ -17,6 +17,7 @@
 package evm
 
 import (
+	"fmt"
 	"errors"
 	"github.com/darmaproject/darmasuite/dvm/core/vm"
 	"math/big"
@@ -510,3 +511,25 @@ func (evm *EVM) GetContext() vm.Context {
 	return evm.Context
 }
 
+func (evm *EVM) Deposit(caller common.Address, amount big.Int) (err error) {
+	if !evm.StateDB.Exist(caller) {
+		evm.StateDB.CreateAccount(caller)
+	}
+	evm.StateDB.AddBalance(caller,&amount)
+	return nil
+}
+
+func (evm *EVM) Withdraw(caller common.Address, amount big.Int) (error) {
+	if !evm.StateDB.Exist(caller) {
+		return fmt.Errorf("caller is not exists. caller= %x", caller)
+	}
+	balance := evm.StateDB.GetBalance(caller)
+	if balance == nil {
+		return fmt.Errorf("caller's balance is nil. caller= %x", caller)
+	}
+	if balance.Cmp(&amount) < 0 { // if balance < amount
+		return fmt.Errorf("caller's balance is not enough. caller= %x, balance= %s, amount= %s", caller,balance.String(),amount.String())
+	}
+	evm.StateDB.SubBalance(caller,&amount)
+	return nil
+}

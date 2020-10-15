@@ -117,4 +117,6 @@ type VM interface {
 	GetStateDb() inter.StateDB
 	ChainConfig() *params.ChainConfig
 	GetContext() Context
+	Deposit(caller common.Address, amount big.Int) (err error)
+	Withdraw(caller common.Address, amount big.Int) (err error)
 }
