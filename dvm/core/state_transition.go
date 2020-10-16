@@ -117,7 +117,7 @@ func NewStateTransition(vm vm.VM, msg Message, gp *GasPool) *StateTransition {
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(vm vm.VM, msg Message, gp *GasPool) ([]byte, uint64, []byte, error) {
-	rlog.Error("---ApplyMessage---")
+	rlog.Info("---ApplyMessage---")
 	return NewStateTransition(vm, msg, gp).TransitionDb()
 }
 
@@ -173,10 +173,6 @@ func (st *StateTransition) preCheck() error {
 func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, contactAddr []byte, err error) {
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
-
-	//Initialize account balance, gas + amount
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), st.gasPrice)
-	st.state.AddBalance(msg.From(), new(big.Int).Add(mgval, msg.Value()))
 
 	if err = st.preCheck(); err != nil {
 		return nil, 0, nil, err

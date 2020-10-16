@@ -46,12 +46,6 @@ type (
 	AddressToString func([]byte) string
 )
 
-// any external tranfers
-type TransferExternal struct {
-	Address common.Address `msgpack:"A,omitempty" json:"A,omitempty"` //  transfer to this blob
-	Amount  uint64         `msgpack:"V,omitempty" json:"V,omitempty"` // Amount in Atomic units
-}
-
 type Context struct {
 	// CanTransfer returns whether the account contains
 	// sufficient ether to transfer the value
@@ -73,9 +67,6 @@ type Context struct {
 	BlockNumber *big.Int       // Provides information for NUMBER
 	Time        *big.Int       // Provides information for TIME
 	Difficulty  *big.Int       // Provides information for DIFFICULTY
-
-	//External transfers
-	TxStorage []TransferExternal `msgpack:"T,omitempty"` // all external transfers
 }
 
 func (ctx *Context) CanTransfer(db inter.StateDB, addr common.Address, amount *big.Int) bool {
@@ -87,24 +78,7 @@ func (ctx *Context) Transfer(db inter.StateDB, sender, recipient common.Address,
 
 	ctx.TransferFunc(db, sender, recipient, amount)
 
-	//External transfers only support non-contract addresses
-	code := db.GetCode(recipient)
-	if !isCreate && len(code) == 0 {
-		ctx.TransferEx(recipient, amount)
-	}
-
 	return true
-}
-
-//TransferCallback any external tranfers from contract address
-func (ctx *Context) TransferEx(recipient common.Address, amount *big.Int) {
-	value := amount.Uint64()
-	if ctx.TxStorage == nil {
-		ctx.TxStorage = make([]TransferExternal, 0)
-	}
-
-	txEntry := TransferExternal{recipient, value}
-	ctx.TxStorage = append(ctx.TxStorage, txEntry)
 }
 
 type VM interface {

@@ -31,9 +31,10 @@ const (
 )
 
 func (scdata *SCData) Serialize(buf *bytes.Buffer) {
-	//TODO:
 	var scDataBuf bytes.Buffer
 	buffer := make([]byte, binary.MaxVarintLen64)
+
+	// serialize fields BEGIN
 
 	scDataBuf.Write(scdata.Sender[:])
 
@@ -57,13 +58,15 @@ func (scdata *SCData) Serialize(buf *bytes.Buffer) {
 
 	scDataBuf.Write(scdata.Sig[:])
 
+	n = binary.PutUvarint(buffer, uint64(scdata.Type))
+	scDataBuf.Write(buffer[:n])
+
+	// serialize fields END
+
 	scDataBytes := scDataBuf.Bytes()
 	n = binary.PutUvarint(buffer, uint64(len(scDataBytes)))
 	buf.Write(buffer[:n])
 	buf.Write(scDataBytes)
-
-	n = binary.PutUvarint(buffer, uint64(scdata.Type))
-	scDataBuf.Write(buffer[:n])
 }
 
 func (scdata *SCData) Deserialize(buf *bytes.Reader) ([]byte, error) {
@@ -144,7 +147,7 @@ func (scdata *SCData) Deserialize(buf *bytes.Reader) ([]byte, error) {
 
 	typeU64, done := binary.Uvarint(contract)
 	if done != 1 { // sizeof(uint8) == 1
-		return nil, fmt.Errorf("Invalid Type in Contract\n")
+		return nil, fmt.Errorf("Invalid Type in Contract. done= %d\n",done)
 	}
 	scdata.Type = uint8(typeU64)
 	contract = contract[done:]

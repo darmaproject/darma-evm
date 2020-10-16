@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/darmaproject/darmasuite/address"
@@ -63,16 +64,6 @@ type SCStorage struct {
 	TransferE []SCTransferE `msgpack:"T,omitempty"`
 }
 
-type SCRefundGas struct {
-	Address common.Address `msgpack:"A,omitempty"`
-	Total   uint64         `msgpack:"T,omitempty"`
-	Refund  uint64         `msgpack:"R,omitempty"`
-}
-
-type SCRefundGasStorage struct {
-	RefundGas []SCRefundGas `msgpack:"R,omitempty"`
-}
-
 const INVALID_CHAIN_HEIGHT = 0x7fffffffffffffff
 
 func (chain *Blockchain) IsCreateContract(tx *transaction.Transaction) bool {
@@ -97,10 +88,16 @@ func (chain *Blockchain) IsContractTransaction(tx *transaction.Transaction) bool
 
 func (chain *Blockchain) VerifyTransactionContract(dbtx storage.DBTX, tx *transaction.Transaction) error {
 	createContract := tx.IsCreateContract()
-	rlog.Error("--------start VerifyTransactionContract------------------", tx.GetHash().String())
+	rlog.Infof("--------start VerifyTransactionContract------------------%s", tx.GetHash().String())
 	if len(tx.Vout) > 2 {
 		return ErrTooManyVout
 	}
+
+	if tx.IsContractDW() {
+		// TODO: Do not verify DW contract tx ?
+		return nil
+	}
+
 	scData := tx.ExtraMap[transaction.TX_EXTRA_CONTRACT].(*transaction.SCData)
 
 	if createContract && len(scData.Payload) < int(config.MIN_CONTRACT_DATASIZE) {
@@ -137,7 +134,7 @@ func (chain *Blockchain) VerifyTransactionContract(dbtx storage.DBTX, tx *transa
 		return ErrInvalidSigner
 	}
 
-	rlog.Error("--------end VerifyTransactionContract------------------")
+	rlog.Infof("--------end VerifyTransactionContract------------------")
 	return nil
 }
 
@@ -168,29 +165,6 @@ func (chain *Blockchain) DecodeContractAmount(tx *transaction.Transaction) (uint
 	}
 
 	return amount, nil
-}
-
-func (chain *Blockchain) loadContractRefund(dbtx storage.DBTX, txid crypto.Hash) (*SCRefundGas, error) {
-	gasBlob, err := dbtx.LoadObject(BLOCKCHAIN_UNIVERSE, GALAXY_TRANSACTION, txid[:], PLANET_CONTRACT_REFUNDGAS_BLOB)
-	if err != nil {
-		return nil, err
-	}
-	if len(gasBlob) == 0 {
-		return nil, fmt.Errorf("empty refund data of tx %s", txid)
-	}
-
-	var refund SCRefundGas
-	err = msgpack.Unmarshal(gasBlob, &refund)
-	if err != nil {
-		return nil, err
-	}
-
-	return &refund, nil
-}
-
-func (chain *Blockchain) storeContractRefund(dbtx storage.DBTX, txid crypto.Hash, refund *SCRefundGas) error {
-	gasBlob, _ := msgpack.Marshal(*refund)
-	return dbtx.StoreObject(BLOCKCHAIN_UNIVERSE, GALAXY_TRANSACTION, txid[:], PLANET_CONTRACT_REFUNDGAS_BLOB, gasBlob)
 }
 
 func (chain *Blockchain) loadContractTransfer(dbtx storage.DBTX, txid crypto.Hash) (*SCStorage, error) {
@@ -264,18 +238,9 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 		return nil
 	}
 
-	rlog.Error("---ApplyContract---")
+	rlog.Info("---ApplyContract---")
 
 	scdata := tx.ExtraMap[transaction.TX_EXTRA_CONTRACT].(*transaction.SCData)
-	if scdata.Amount > 0 {
-		amount, err := chain.DecodeContractAmount(tx)
-		if err != nil {
-			return err
-		}
-		if scdata.Amount != amount {
-			return fmt.Errorf("amount not matched. scdata.Amount = %d, amount = %d", scdata.Amount, amount)
-		}
-	}
 
 	msg, err := transaction.AsMessage(scdata)
 	if err != nil {
@@ -314,18 +279,32 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 
 	if scdata.Type == transaction.SCDATA_DEPOSIT_TYPE || scdata.Type == transaction.SCDATA_WITHDRAW_TYPE { // if tx is type of DEPOSIT or WITHDRAW
 		caller := msg.From()
-		amount := msg.Value()
-		if amount != nil {
-			var err error
-			if scdata.Type == transaction.SCDATA_DEPOSIT_TYPE {
-				rlog.Debugf("address %x deposit %d into VM",caller,*amount)
-				err = vmenv.Deposit(caller,*amount)
-			} else {
-				rlog.Debugf("address %x withdraw %d from VM",caller,*amount)
-				err = vmenv.Withdraw(caller,*amount)
+		switch scdata.Type {
+		case transaction.SCDATA_DEPOSIT_TYPE:
+			if scdata.Amount > 0 {
+				amount, err := chain.DecodeContractAmount(tx)
+				if err != nil {
+					return fmt.Errorf("decode amount from tx failed: %s", err.Error())
+				}
+				if scdata.Amount != amount {
+					return fmt.Errorf("amount not matched. scdata.Amount = %d, amount = %d", scdata.Amount, amount)
+				}
 			}
-			return err
+			amount := msg.Value()
+			rlog.Debugf("address %x deposit %s into VM",caller,amount.String())
+			err = vmenv.Deposit(caller,*amount)
+		case transaction.SCDATA_WITHDRAW_TYPE:
+			bytesAmount := msg.Data()
+			uintAmount := bytesAmountToUintAmount(bytesAmount)
+			amount := new(big.Int).SetUint64(uintAmount)
+			rlog.Debugf("address %x withdraw %s from VM",caller,amount.String())
+			err = vmenv.Withdraw(caller,*amount)
+			//: create new UTXO in blockchain
+			var sctxData SCStorage
+			sctxData.TransferE = append(sctxData.TransferE, SCTransferE{scdata.Sender.String(),uintAmount}) // sender is Darma address format, caller is contract address format
+			chain.storeContractTransfer(dbtx, txHash, &sctxData)
 		}
+		return err
 	}
 
 	ret, gasUsed, contractAddr, err := dvm.ApplyMessage(vmenv, msg, gp)
@@ -345,31 +324,14 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 		chain.storeContractOrigin(dbtx, contractAddr, msg.From())
 	}
 
-	if msg.Gas() > gasUsed {
-		total := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
-		remaining := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()-gasUsed), msg.GasPrice())
-
-		refund := SCRefundGas{
-			Address: scdata.Sender,
-			Total:   total.Uint64(),
-			Refund:  remaining.Uint64(),
-		}
-		chain.storeContractRefund(dbtx, txHash, &refund)
-		rlog.Debugf("gas limit %d, gas used %d, tx %s", msg.Gas(), gasUsed, txHash)
-	}
-
-	txStorage := vmenv.GetContext().TxStorage
-	if len(txStorage) > 0 {
-		var sctxData SCStorage
-		copy(sctxData.SCID[0:], contractAddr)
-		for _, v := range txStorage {
-			entry := SCTransferE{
-				Address: v.Address.String(),
-				Amount:  v.Amount,
-			}
-			sctxData.TransferE = append(sctxData.TransferE, entry)
-		}
-		chain.storeContractTransfer(dbtx, txHash, &sctxData)
+	totalGasSupply := msg.Gas()
+	if totalGasSupply > gasUsed {
+		remainingGas := totalGasSupply - gasUsed
+		price := msg.GasPrice()
+		totalValue := new(big.Int).Mul(new(big.Int).SetUint64(totalGasSupply), price)
+		remainingValue := new(big.Int).Mul(new(big.Int).SetUint64(remainingGas), msg.GasPrice())
+		statedb.AddBalance(msg.From(),remainingValue)
+		rlog.Debugf("gas total supply %d(value:%s), used %d, remain %d(value:%s), tx= %s", totalGasSupply, totalValue.String(), gasUsed, remainingGas, remainingValue.String(), txHash)
 	}
 
 	logs := statedb.GetLogs(common.Hash(txHash))
@@ -390,7 +352,6 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 				})
 			}
 		}
-
 	}
 	if len(transfers) > 0 {
 		chain.storeErc20Transfers(dbtx, txHash, transfers)
@@ -398,6 +359,10 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 
 	rlog.Debugf("Apply contact success, contract address %x", contractAddr)
 	return nil
+}
+
+func bytesAmountToUintAmount(amount []byte) uint64 {
+	return binary.BigEndian.Uint64(amount)
 }
 
 func (chain *Blockchain) CallContact(scdata *transaction.SCData, topoHeight int64) ([]byte, error) {
