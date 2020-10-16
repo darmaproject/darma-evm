@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"errors"
 	"github.com/darmaproject/darmasuite/dvm/core/vm"
+<<<<<<< HEAD
 	"github.com/romana/rlog"
+=======
+>>>>>>> 4c17f25eda6f8eefa5bdc69a367db53ccfd879fc
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -517,7 +520,10 @@ func (evm *EVM) Deposit(caller common.Address, amount big.Int) (err error) {
 		evm.StateDB.CreateAccount(caller)
 	}
 	evm.StateDB.AddBalance(caller,&amount)
+<<<<<<< HEAD
 	rlog.Debugf("EVM.Deposit: statedb.GetBalance(%x)= %s",caller,evm.StateDB.GetBalance(caller).String())
+=======
+>>>>>>> 4c17f25eda6f8eefa5bdc69a367db53ccfd879fc
 	return nil
 }
 
@@ -533,6 +539,9 @@ func (evm *EVM) Withdraw(caller common.Address, amount big.Int) (error) {
 		return fmt.Errorf("caller's balance is not enough. caller= %x, balance= %s, amount= %s", caller,balance.String(),amount.String())
 	}
 	evm.StateDB.SubBalance(caller,&amount)
+<<<<<<< HEAD
 	rlog.Debugf("EVM.Withdraw: statedb.GetBalance(%x)= %s",caller,evm.StateDB.GetBalance(caller).String())
+=======
+>>>>>>> 4c17f25eda6f8eefa5bdc69a367db53ccfd879fc
 	return nil
 }

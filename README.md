@@ -1,5 +1,4 @@
 # Darma-dvm
 
-This is the implementation part of smart contract function of Darma project.
-
-update readme test
+DVM already supports WASM virtual machine.
+DVM will support Ethereum EVM and be compatible with Solidity.
