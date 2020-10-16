@@ -21,10 +21,7 @@ import (
 	"github.com/darmaproject/darmasuite/dvm/core/types"
 	"github.com/darmaproject/darmasuite/dvm/params"
 	"github.com/holiman/uint256"
-<<<<<<< HEAD
 	"github.com/romana/rlog"
-=======
->>>>>>> 4c17f25eda6f8eefa5bdc69a367db53ccfd879fc
 	"golang.org/x/crypto/sha3"
 )
 
@@ -264,10 +261,7 @@ func opBalance(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([
 	slot := callContext.stack.peek()
 	address := common.Address(slot.Bytes32())
 	slot.SetFromBig(interpreter.evm.StateDB.GetBalance(address))
-<<<<<<< HEAD
 	rlog.Debugf("interpreter.evm.StateDB.GetBalance(address=%x)= %s",address,interpreter.evm.StateDB.GetBalance(address).String())
-=======
->>>>>>> 4c17f25eda6f8eefa5bdc69a367db53ccfd879fc
 	return nil, nil
 }
 
