@@ -9,6 +9,7 @@ import (
 	"github.com/darmaproject/darmasuite/config"
 	"github.com/darmaproject/darmasuite/crypto"
 	"github.com/darmaproject/darmasuite/dvm/accounts/abi"
+	"github.com/darmaproject/darmasuite/dvm/common"
 	"github.com/darmaproject/darmasuite/dvm/core/wavm"
 	"github.com/darmaproject/darmasuite/globals"
 	"github.com/darmaproject/darmasuite/stake"
@@ -2827,4 +2828,15 @@ func (w *MobileWallet) Set_Rlog_Env() {
 	}
 
 	rlog.UpdateEnv()
+}
+
+func (w *MobileWallet) GetContractAccountAddress(darmaAddress string) (string,error) {
+	a, err := address.NewAddress(darmaAddress)
+	if err != nil {
+		return "", fmt.Errorf("address is invalid")
+	}
+	darmaBytesAddres := a.ToContractAddress()
+	contractBytesAddress := common.DarmaAddressToContractAddress(darmaBytesAddres)
+	contractStrAddress := fmt.Sprintf("%x",contractBytesAddress[12:]) // get last 20 bytes from 32 bytes
+	return contractStrAddress, nil
 }

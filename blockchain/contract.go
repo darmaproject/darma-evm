@@ -299,10 +299,12 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 			amount := new(big.Int).SetUint64(uintAmount)
 			rlog.Debugf("address %x withdraw %s from VM",caller,amount.String())
 			err = vmenv.Withdraw(caller,*amount)
-			//: create new UTXO in blockchain
-			var sctxData SCStorage
-			sctxData.TransferE = append(sctxData.TransferE, SCTransferE{scdata.Sender.String(),uintAmount}) // sender is Darma address format, caller is contract address format
-			chain.storeContractTransfer(dbtx, txHash, &sctxData)
+			if err == nil {
+				//: create new UTXO in blockchain
+				var sctxData SCStorage
+				sctxData.TransferE = append(sctxData.TransferE, SCTransferE{scdata.Sender.String(), uintAmount}) // sender is Darma address format, caller is contract address format
+				chain.storeContractTransfer(dbtx, txHash, &sctxData)
+			}
 		}
 		return err
 	}
@@ -700,4 +702,27 @@ func (chain *Blockchain) getContractEphermalKey(txid crypto.Hash, index_within_t
 	// this becomes the key within Vout
 	ehphermal_public_key = derivation.KeyDerivationToPublicKey(index_within_tx, pubkey)
 	return
+}
+
+func (chain *Blockchain) GetBalanceOfContractAccount(account common.Address) (*big.Int, error) {
+	dbtx, err := chain.store.BeginTX(false)
+	if err != nil {
+		return nil, err
+	}
+
+	defer dbtx.Rollback()
+
+	topoHeight := chain.LoadTopoHeight(dbtx)
+
+	statedb, err := chain.NewStateDB(dbtx, topoHeight)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if statedb == nil {
+		return nil, fmt.Errorf("new statedb failed")
+	}
+
+	return statedb.GetBalance(account), nil
 }

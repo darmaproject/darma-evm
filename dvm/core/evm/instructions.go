@@ -692,7 +692,6 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]by
 	if !value.IsZero() {
 		gas += params.CallStipend
 		bigVal = value.ToBig()
-		toAddr = common.HexToAddress("c764d7e20b021b148c6c89047e0cc37a681118fc188fd0ab1e5b930ec5972e3f")
 	}
 
 	ret, returnGas, err := interpreter.evm.Call(callContext.contract, toAddr, args, gas, bigVal)
