@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"github.com/romana/rlog"
 	"math/big"
 
 	"github.com/darmaproject/darmasuite/dvm/common"
@@ -109,6 +110,7 @@ var PrecompiledContractsYoloV1 = map[common.Address]PrecompiledContract{
 func RunPrecompiledContract(p PrecompiledContract, input []byte, suppliedGas uint64) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
+		rlog.Errorf("out of gas: supplied gas %d not enough, required gas %d",suppliedGas,gasCost,gasCost)
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost

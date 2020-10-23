@@ -17,6 +17,7 @@
 package evm
 
 import (
+	"github.com/romana/rlog"
 	"hash"
 	"sync/atomic"
 
@@ -243,7 +244,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 		// Static portion of gas
 		cost = operation.constantGas // For tracing
+		rlog.Infof("contract gas %d, operation %s use constant gas %d\n",contract.Gas,opCodeToString[op],operation.constantGas)
 		if !contract.UseGas(operation.constantGas) {
+			rlog.Errorf("out of gas: use constant gas\n")
 			return nil, ErrOutOfGas
 		}
 
@@ -270,7 +273,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			var dynamicCost uint64
 			dynamicCost, err = operation.dynamicGas(in.evm, contract, stack, mem, memorySize)
 			cost += dynamicCost // total cost, for debug tracing
+			rlog.Infof("contract gas %d, operation %s use dynamic gas %d\n",contract.Gas,opCodeToString[op],dynamicCost)
 			if err != nil || !contract.UseGas(dynamicCost) {
+				rlog.Errorf("out of gas: dynamic cost\n")
 				return nil, ErrOutOfGas
 			}
 		}

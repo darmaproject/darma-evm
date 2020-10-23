@@ -18,6 +18,7 @@ package evm
 
 import (
 	"github.com/holiman/uint256"
+	"github.com/romana/rlog"
 )
 
 // Gas costs
@@ -35,6 +36,11 @@ const (
 // The cost of gas was changed during the homestead price change HF.
 // As part of EIP 150 (TangerineWhistle), the returned gas is gas - base * 63 / 64.
 func callGas(isEip150 bool, availableGas, base uint64, callCost *uint256.Int) (uint64, error) {
+	if callCost == nil {
+		rlog.Infof("callGas() DEBUG: isEip150=%t, availableGas=%d, base=%d, callCost=<nil>", isEip150, availableGas, base)
+	} else {
+		rlog.Infof("callGas() DEBUG: isEip150=%t, availableGas=%d, base=%d, callCost=%d", isEip150, availableGas, base, callCost.Uint64())
+	}
 	if isEip150 {
 		availableGas = availableGas - base
 		gas := availableGas - availableGas/64

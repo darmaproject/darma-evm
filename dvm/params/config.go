@@ -145,5 +145,10 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 	if chainID == nil {
 		chainID = new(big.Int)
 	}
-	return Rules{ChainID: new(big.Int).Set(chainID), IsYoloV1: true} // other field is default value: false
+	return Rules{
+		ChainID: new(big.Int).Set(chainID),
+		IsEIP150: true, // [Gas cost changes for IO-heavy operations](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md)
+		IsYoloV1: true,
+		// other field is default value: false
+	}
 }
