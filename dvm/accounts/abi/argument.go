@@ -411,6 +411,12 @@ func (arguments Arguments) UnpackStrArgs(data []byte) (string, error) {
 			return "1", err
 		}
 		return "0", err
+	case FixedBytesTy:
+		bytes, err := readFixedBytes(abiArgs[0].Type,data)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%x",bytes), err
 	default:
 		err := fmt.Errorf("unsupported type \"%s\"", abiArgs[0].Type.String())
 		return "", err
