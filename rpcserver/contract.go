@@ -80,7 +80,7 @@ func (h CallContractHandler) ServeJSONRPC(c context.Context, params *fastjson.Ra
 		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("GasPrice is not enough")}
 	}
 	if p.GasPrice == 0 {
-		p.Gas = config.DEFAULT_GASPRICE
+		p.GasPrice = config.DEFAULT_GASPRICE
 	}
 
 	payload, err := hexutil.Decode(p.Data)

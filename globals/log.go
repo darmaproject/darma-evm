@@ -26,8 +26,12 @@ func initRlog(level string) {
 		os.Setenv("RLOG_TRACE_LEVEL", "100") // fixme: 100?
 	}
 
-	if os.Getenv("RLOG_LOG_LEVEL") == "" && level != "" && level != "trace" {
-		os.Setenv("RLOG_LOG_LEVEL", strings.ToUpper(level)) // default logging in debug mode
+	if os.Getenv("RLOG_LOG_LEVEL") == "" && level != "" {
+		if level == "trace" {
+			os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
+		} else {
+			os.Setenv("RLOG_LOG_LEVEL", strings.ToUpper(level)) // default logging in debug mode
+		}
 	}
 
 	if os.Getenv("RLOG_LOG_FILE") == "" {
