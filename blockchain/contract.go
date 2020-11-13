@@ -11,9 +11,10 @@ import (
 	"github.com/darmaproject/darmasuite/crypto"
 	"github.com/darmaproject/darmasuite/dvm/common"
 	"github.com/darmaproject/darmasuite/dvm/core"
+	"github.com/darmaproject/darmasuite/dvm/core/rawdb"
 	"github.com/darmaproject/darmasuite/dvm/core/state"
 	"github.com/darmaproject/darmasuite/dvm/core/types"
-	"github.com/darmaproject/darmasuite/dvm/core/rawdb"
+	"github.com/darmaproject/darmasuite/dvm/rlp"
 	"github.com/darmaproject/darmasuite/globals"
 	"github.com/darmaproject/darmasuite/ringct"
 	"github.com/darmaproject/darmasuite/storage"
@@ -316,6 +317,22 @@ func (chain *Blockchain) ApplyContract(dbtx storage.DBTX,
 	}
 
 	rlog.Infof("ApplyMessage ret: %x", ret)
+
+	// make an receipt for the tx
+	receipt := types.NewReceipt(nil, (err != nil), gasUsed)
+	receipt.TxHash = common.Hash(txHash)
+	receipt.GasUsed = gasUsed
+	txCreatedAContract := (msg.To() == nil)
+	if txCreatedAContract {
+		copy(receipt.ContractAddress[:],contractAddr[:])
+	}
+	receipt.Logs = statedb.GetLogs(common.Hash(txHash))
+	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+	receipt.BlockHash = statedb.BlockHash()
+	receipt.BlockNumber = header.Number
+	receipt.TransactionIndex = uint(statedb.TxIndex())
+	chain.StoreTxReceipt(dbtx,txHash,receipt)
+
 	if err != nil {
 		return err
 	}
@@ -725,4 +742,56 @@ func (chain *Blockchain) GetBalanceOfContractAccount(account common.Address) (*b
 	}
 
 	return statedb.GetBalance(account), nil
+}
+
+func (chain *Blockchain) StoreTxReceipt(dbtx storage.DBTX, txHash crypto.Hash, receipt *types.Receipt) bool {
+	rlog.Debugf("StoreTxReceipt txHash=%s",txHash.String())
+
+	receiptBytes, err := rlp.EncodeToBytes(receipt)
+	if err != nil {
+		rlog.Errorf("encode receipt to bytes error: %s",err.Error())
+		return false
+	}
+	err = dbtx.StoreObject(BLOCKCHAIN_UNIVERSE, GALAXY_CONTRACT, txHash[:], PLANET_CONTRACT_TX_RECEIPT, receiptBytes)
+	if err != nil {
+		rlog.Errorf("store receipt bytes error: %s",err.Error())
+		return false
+	}
+	return true
+}
+
+func (chain *Blockchain) LoadTxReceipt(dbtx storage.DBTX, txHash crypto.Hash) (receipt *types.Receipt, err error) {
+	rlog.Debugf("LoadTxReceipt txHash=%s",txHash.String())
+	if dbtx == nil {
+		dbtx, err = chain.store.BeginTX(false)
+		if err != nil {
+			rlog.Errorf("chain.store.BeginTX() error: %s",err.Error())
+			return
+		}
+		defer dbtx.Rollback()
+	}
+
+	receiptBytes, err := dbtx.LoadObject(BLOCKCHAIN_UNIVERSE, GALAXY_CONTRACT, txHash[:], PLANET_CONTRACT_TX_RECEIPT)
+	if err != nil {
+		rlog.Errorf("load receipt bytes error: %s",err.Error())
+		return
+	}
+
+	receipt = new(types.Receipt)
+	err = rlp.DecodeBytes(receiptBytes,receipt)
+	if err != nil {
+		rlog.Errorf("decode receipt bytes error: %s",err.Error())
+		return
+	}
+
+	contractAddress,err := chain.LoadContractAddressByTxid(dbtx,txHash)
+	if err != nil {
+		rlog.Errorf("load contract address error: %s",err.Error())
+		return
+	}
+	copy(receipt.ContractAddress[:],contractAddress)
+
+	receipt.GasUsed = receipt.CumulativeGasUsed
+
+	return receipt, nil
 }

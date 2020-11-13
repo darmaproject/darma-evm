@@ -33,9 +33,7 @@ import (
 import "github.com/intel-go/fastjson"
 import "github.com/osamingo/jsonrpc"
 
-type EthWeb3JsRpcHandler_eth_call struct {
-	r *RPCServer
-}
+type EthWeb3JsRpcHandler_eth_call struct {}
 
 type EthWeb3JsRpcParams_eth_call struct {
 	args CallArgs
@@ -224,16 +222,27 @@ func (h EthWeb3JsRpcHandler_eth_call) ServeJSONRPC(c context.Context, params *fa
 		return nil, jsonrpc.ErrInvalidParams()
 	}
 
-	to := common.Address{}
+	if callParams.args.From == nil {
+		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("`from` is null")}
+	}
+	if callParams.args.To == nil {
+		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("`to` is null")}
+	}
+	if callParams.args.Data == nil {
+		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("`data` is null")}
+	}
+
+	var from, to common.Address
+	copy(from[12:],(*callParams.args.From)[:])
 	copy(to[12:],(*callParams.args.To)[:])
 
 	data := make([]byte,len(*callParams.args.Data))
 	copy(data,*callParams.args.Data)
 
-	rlog.Infof("to=0x%x, data=%x\n",to,data)
+	rlog.Debugf("eth_call from=0x%x, to=0x%x, data=%x\n",from,to,data)
 
 	blockNumber,_ := callParams.blockNrOrHash.Number()
-	rlog.Infof("blockNumber=%d\n",blockNumber)
+	rlog.Debugf("eth_call blockNumber=%d\n",blockNumber)
 
 	var p structures.CallContractParams
 	p.To = hexutil.Encode(to[:])
@@ -262,8 +271,11 @@ func (h EthWeb3JsRpcHandler_eth_call) ServeJSONRPC(c context.Context, params *fa
 		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("Data is invalid")}
 	}
 
-	var sender common.Address
-	copy(sender[12:],callParams.args.From[:])
+	if callParams.args.From == nil {
+		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("From is null")}
+	}
+
+	sender := from
 
 	scdata := &transaction.SCData{
 		Sender:       sender,
@@ -275,7 +287,7 @@ func (h EthWeb3JsRpcHandler_eth_call) ServeJSONRPC(c context.Context, params *fa
 		Payload:      payload,
 	}
 
-	rlog.Debugf("scdata: {sender:%x, nonce:%d, price:%d, gaslimit:%d, amount:%d, recipient:%x, payload:%x}",scdata.Sender,scdata.AccountNonce,scdata.Price,scdata.GasLimit,scdata.Amount,scdata.Recipient,scdata.Payload)
+	rlog.Debugf("eth_call scdata: {sender:%x, nonce:%d, price:%d, gaslimit:%d, amount:%d, recipient:%x, payload:%x}",scdata.Sender,scdata.AccountNonce,scdata.Price,scdata.GasLimit,scdata.Amount,scdata.Recipient,scdata.Payload)
 	res, err := chain.CallContact(scdata, p.TopoHeight)
 	if err != nil {
 		return nil, &jsonrpc.Error{Code: -2, Message: fmt.Sprintf("call failed: %s",err.Error())}

@@ -171,3 +171,26 @@ func (h GetBalanceOfContractAccountHandler) ServeJSONRPC(c context.Context, para
 		fmt.Sprintf("%d", balance.Uint64()),
 	}, nil
 }
+
+type GetContractAccountAddressHandler struct{}
+
+func (h GetContractAccountAddressHandler) ServeJSONRPC(c context.Context, rawMessage *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
+	rlog.Debugf("GetContractAccountAddressHandler.ServeJSONRPC rawMessage=0x%x",*rawMessage)
+	var params []string
+	if err := jsonrpc.Unmarshal(rawMessage, &params); err != nil {
+		return nil, &jsonrpc.Error{Code: -1, Message: fmt.Sprintf("unmarshal params error: %s",err.Error())}
+	}
+
+	if len(params) < 1 {
+		return nil, &jsonrpc.Error{Code: -1, Message: fmt.Sprintf("params too few")}
+	}
+
+	darmaAddress, err := address.NewAddress(params[0])
+	if err != nil {
+		return nil, &jsonrpc.Error{Code: -1, Message: fmt.Sprintf("internal error: address is invalid")}
+	}
+	darmaBytesAddres := darmaAddress.ToContractAddress()
+	contractAccountAddress := common.DarmaAddressToContractAddress(darmaBytesAddres)
+
+	return fmt.Sprintf("0x%x",contractAccountAddress[12:]), nil
+}

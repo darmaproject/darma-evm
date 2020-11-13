@@ -334,3 +334,16 @@ func (r Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, num
 	}
 	return nil
 }
+
+func (r Receipt) DeriveFields(blockNumber uint64, blockHash common.Hash, txHash common.Hash, txIndex uint) (err error) {
+	var logIndex uint
+	for j := 0; j < len(r.Logs); j++ {
+		r.Logs[j].BlockNumber = blockNumber
+		r.Logs[j].BlockHash = blockHash
+		r.Logs[j].TxHash = txHash
+		r.Logs[j].TxIndex = txIndex
+		r.Logs[j].Index = logIndex
+		logIndex++
+	}
+	return
+}

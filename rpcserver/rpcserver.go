@@ -238,6 +238,10 @@ func (r *RPCServer) Run() {
 		log.Fatalln(err)
 	}
 
+	if err := mr.RegisterMethod("get_contract_account_address", GetContractAccountAddressHandler{}, nil, nil); err != nil {
+		log.Fatalln(err)
+	}
+
 	// For support ETH Web3.js RPC
 
 	if err := mr.RegisterMethod("eth_blockNumber", EthWeb3JsRpcHandler_eth_blockNumber{}, nil, nil); err != nil {
@@ -248,7 +252,11 @@ func (r *RPCServer) Run() {
 		log.Fatalln(err)
 	}
 
-	if err := mr.RegisterMethod("eth_call", EthWeb3JsRpcHandler_eth_call{r}, EthWeb3JsRpcParams_eth_call{}, nil); err != nil {
+	if err := mr.RegisterMethod("eth_call", EthWeb3JsRpcHandler_eth_call{}, EthWeb3JsRpcParams_eth_call{}, nil); err != nil {
+		log.Fatalln(err)
+	}
+
+	if err := mr.RegisterMethod("eth_getTransactionReceipt", EthWeb3JsRpcHandler_eth_getTransactionReceipt{}, nil, nil); err != nil {
 		log.Fatalln(err)
 	}
 
